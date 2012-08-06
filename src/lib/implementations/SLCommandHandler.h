@@ -32,7 +32,6 @@
  */
 
 #include "CECCommandHandler.h"
-#include "../platform/util/timeutils.h"
 
 namespace CEC
 {
@@ -67,13 +66,15 @@ namespace CEC
     int HandleRequestActiveSource(const cec_command &command);
     int HandleFeatureAbort(const cec_command &command);
     int HandleStandby(const cec_command &command);
-    bool TransmitMenuState(const cec_logical_address UNUSED(iInitiator), const cec_logical_address UNUSED(iDestination), cec_menu_state UNUSED(menuState)) { return true; }
+    bool TransmitMenuState(const cec_logical_address UNUSED(iInitiator), const cec_logical_address UNUSED(iDestination), cec_menu_state UNUSED(menuState), bool UNUSED(bIsReply)) { return true; }
     bool PowerOn(const cec_logical_address iInitiator, const cec_logical_address iDestination);
 
     void ResetSLState(void);
     bool SLInitialised(void);
     void SetSLInitialised(void);
     bool ActiveSourceSent(void);
+
+    void VendorPreActivateSourceHook(void);
 
     bool               m_bSLEnabled;
     bool               m_bActiveSourceSent;

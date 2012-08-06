@@ -30,28 +30,35 @@
  *     http://www.pulse-eight.net/
  */
 
+#include "env.h"
 #include "USBCECAdapterCommunication.h"
+
 #include "USBCECAdapterCommands.h"
 #include "USBCECAdapterMessageQueue.h"
-#include "../platform/sockets/serialport.h"
-#include "../platform/util/timeutils.h"
-#include "../platform/util/util.h"
-#include "../platform/util/edid.h"
-#include "../platform/adl/adl-edid.h"
-#include "../platform/nvidia/nv-edid.h"
-#include "../LibCEC.h"
-#include "../CECProcessor.h"
+#include "USBCECAdapterMessage.h"
+#include "lib/platform/sockets/serialport.h"
+#include "lib/platform/util/timeutils.h"
+#include "lib/platform/util/util.h"
+#include "lib/platform/util/edid.h"
+#include "lib/platform/adl/adl-edid.h"
+#include "lib/platform/nvidia/nv-edid.h"
+#include "lib/LibCEC.h"
+#include "lib/CECProcessor.h"
 
 using namespace std;
 using namespace CEC;
 using namespace PLATFORM;
 
-#define CEC_ADAPTER_PING_TIMEOUT 15000
+#define CEC_ADAPTER_PING_TIMEOUT          15000
+#define CEC_ADAPTER_EEPROM_WRITE_INTERVAL 30000
+#define CEC_ADAPTER_EEPROM_WRITE_RETRY    5000
 
 // firmware version 2
 #define CEC_LATEST_ADAPTER_FW_VERSION 2
-// firmware date Thu Apr 26 20:14:49 2012 +0000
-#define CEC_LATEST_ADAPTER_FW_DATE    0x4F99ACB9
+// firmware date Thu Aug  2 08:31:24 UTC 2012
+#define CEC_LATEST_ADAPTER_FW_DATE    0x501a4b0c
+
+#define CEC_FW_DATE_EXTENDED_RESPONSE 0x501a4b0c
 
 #define LIB_CEC m_callback->GetLib()
 
@@ -62,10 +69,11 @@ CUSBCECAdapterCommunication::CUSBCECAdapterCommunication(IAdapterCommunicationCa
     m_lastPollDestination(CECDEVICE_UNKNOWN),
     m_bInitialised(false),
     m_pingThread(NULL),
+    m_eepromWriteThread(NULL),
     m_commands(NULL),
-    m_adapterMessageQueue(NULL),
-    m_iAckMask(0xFFFF)
+    m_adapterMessageQueue(NULL)
 {
+  m_logicalAddresses.Clear();
   for (unsigned int iPtr = CECDEVICE_TV; iPtr < CECDEVICE_BROADCAST; iPtr++)
     m_bWaitingForAck[iPtr] = false;
   m_port = new CSerialPort(strPort, iBaudRate);
@@ -149,7 +157,8 @@ bool CUSBCECAdapterCommunication::Open(uint32_t iTimeoutMs /* = CEC_DEFAULT_CONN
   }
 
   // always start by setting the ackmask to 0, to clear previous values
-  SetAckMask(0);
+  cec_logical_addresses addresses; addresses.Clear();
+  SetLogicalAddresses(addresses);
 
   if (!CreateThread())
   {
@@ -163,17 +172,27 @@ bool CUSBCECAdapterCommunication::Open(uint32_t iTimeoutMs /* = CEC_DEFAULT_CONN
   }
   else if (bStartListening)
   {
-    /* start a ping thread, that will ping the adapter every 15 seconds
-       if it doesn't receive any ping for 30 seconds, it'll switch to auto mode */
-    m_pingThread = new CAdapterPingThread(this, CEC_ADAPTER_PING_TIMEOUT);
-    if (m_pingThread->CreateThread())
+    /* start the eeprom write thread, that handles all eeprom writes async */
+    m_eepromWriteThread = new CAdapterEepromWriteThread(this);
+    if (!m_eepromWriteThread->CreateThread())
     {
-      bConnectionOpened = true;
+      bConnectionOpened = false;
+      LIB_CEC->AddLog(CEC_LOG_ERROR, "could not create the eeprom write thread");
     }
     else
     {
-      bConnectionOpened = false;
-      LIB_CEC->AddLog(CEC_LOG_ERROR, "could not create a ping thread");
+      /* start a ping thread, that will ping the adapter every 15 seconds
+         if it doesn't receive any ping for 30 seconds, it'll switch to auto mode */
+      m_pingThread = new CAdapterPingThread(this, CEC_ADAPTER_PING_TIMEOUT);
+      if (m_pingThread->CreateThread())
+      {
+        bConnectionOpened = true;
+      }
+      else
+      {
+        bConnectionOpened = false;
+        LIB_CEC->AddLog(CEC_LOG_ERROR, "could not create a ping thread");
+      }
     }
   }
 
@@ -194,12 +213,18 @@ void CUSBCECAdapterCommunication::Close(void)
   if (IsOpen() && m_port->GetErrorNumber() == 0)
   {
     LIB_CEC->AddLog(CEC_LOG_DEBUG, "%s - closing the connection", __FUNCTION__);
-    SetAckMask(0);
+    cec_logical_addresses addresses; addresses.Clear();
+    SetLogicalAddresses(addresses);
     if (m_commands->GetFirmwareVersion() >= 2)
       SetControlledMode(false);
   }
 
   m_adapterMessageQueue->Clear();
+
+  /* stop and delete the write thread */
+  if (m_eepromWriteThread)
+    m_eepromWriteThread->Stop();
+  DELETE_AND_NULL(m_eepromWriteThread);
 
   /* stop and delete the ping thread */
   DELETE_AND_NULL(m_pingThread);
@@ -209,7 +234,7 @@ void CUSBCECAdapterCommunication::Close(void)
     m_port->Close();
 }
 
-cec_adapter_message_state CUSBCECAdapterCommunication::Write(const cec_command &data, bool &bRetry, uint8_t iLineTimeout)
+cec_adapter_message_state CUSBCECAdapterCommunication::Write(const cec_command &data, bool &bRetry, uint8_t iLineTimeout, bool UNUSED(bIsReply))
 {
   cec_adapter_message_state retVal(ADAPTER_MESSAGE_STATE_UNKNOWN);
   if (!IsRunning())
@@ -470,7 +495,7 @@ bool CUSBCECAdapterCommunication::IsOpen(void)
   return !IsStopped() && m_port->IsOpen() && IsRunning();
 }
 
-CStdString CUSBCECAdapterCommunication::GetError(void) const
+std::string CUSBCECAdapterCommunication::GetError(void) const
 {
   return m_port->GetError();
 }
@@ -497,18 +522,18 @@ bool CUSBCECAdapterCommunication::StartBootloader(void)
   return false;
 }
 
-bool CUSBCECAdapterCommunication::SetAckMask(uint16_t iMask)
+bool CUSBCECAdapterCommunication::SetLogicalAddresses(const cec_logical_addresses &addresses)
 {
   {
     CLockObject lock(m_mutex);
-    if (m_iAckMask == iMask)
+    if (m_logicalAddresses == addresses)
       return true;
   }
 
-  if (IsOpen() && m_commands->SetAckMask(iMask))
+  if (IsOpen() && m_commands->SetAckMask(addresses.AckMask()))
   {
     CLockObject lock(m_mutex);
-    m_iAckMask = iMask;
+    m_logicalAddresses = addresses;
     return true;
   }
 
@@ -516,10 +541,12 @@ bool CUSBCECAdapterCommunication::SetAckMask(uint16_t iMask)
   return false;
 }
 
-uint16_t CUSBCECAdapterCommunication::GetAckMask(void)
+cec_logical_addresses CUSBCECAdapterCommunication::GetLogicalAddresses(void)
 {
+  cec_logical_addresses addresses;
   CLockObject lock(m_mutex);
-  return m_iAckMask;
+  addresses = m_logicalAddresses;
+  return addresses;
 }
 
 bool CUSBCECAdapterCommunication::PingAdapter(void)
@@ -534,18 +561,35 @@ uint16_t CUSBCECAdapterCommunication::GetFirmwareVersion(void)
 
 uint32_t CUSBCECAdapterCommunication::GetFirmwareBuildDate(void)
 {
-  return IsOpen() ? m_commands->RequestBuildDate() : m_commands ? m_commands->GetPersistedBuildDate() : 0;
+  uint32_t iBuildDate(0);
+  if (m_commands)
+    iBuildDate = m_commands->GetPersistedBuildDate();
+  if (iBuildDate == 0 && IsOpen())
+    iBuildDate = m_commands->RequestBuildDate();
+
+  return iBuildDate;
+}
+
+bool CUSBCECAdapterCommunication::ProvidesExtendedResponse(void)
+{
+  uint32_t iBuildDate(0);
+  if (m_commands)
+    iBuildDate = m_commands->GetPersistedBuildDate();
+
+  return iBuildDate >= CEC_FW_DATE_EXTENDED_RESPONSE;
 }
 
 bool CUSBCECAdapterCommunication::IsRunningLatestFirmware(void)
 {
-  return GetFirmwareVersion() >= CEC_LATEST_ADAPTER_FW_VERSION &&
-      GetFirmwareBuildDate() >= CEC_LATEST_ADAPTER_FW_DATE;
+  return GetFirmwareBuildDate() >= CEC_LATEST_ADAPTER_FW_DATE &&
+      GetFirmwareVersion() >= CEC_LATEST_ADAPTER_FW_VERSION;
 }
 
 bool CUSBCECAdapterCommunication::PersistConfiguration(const libcec_configuration &configuration)
 {
-  return IsOpen() ? m_commands->PersistConfiguration(configuration) : false;
+  return IsOpen() ?
+      m_commands->PersistConfiguration(configuration) && m_eepromWriteThread->Write() :
+      false;
 }
 
 bool CUSBCECAdapterCommunication::GetConfiguration(libcec_configuration &configuration)
@@ -553,7 +597,7 @@ bool CUSBCECAdapterCommunication::GetConfiguration(libcec_configuration &configu
   return IsOpen() ? m_commands->GetConfiguration(configuration) : false;
 }
 
-CStdString CUSBCECAdapterCommunication::GetPortName(void)
+std::string CUSBCECAdapterCommunication::GetPortName(void)
 {
   return m_port->GetName();
 }
@@ -634,7 +678,62 @@ void *CAdapterPingThread::Process(void)
       }
     }
 
-    Sleep(500);
+    Sleep(5);
   }
   return NULL;
+}
+
+void CAdapterEepromWriteThread::Stop(void)
+{
+  StopThread(-1);
+  {
+    CLockObject lock(m_mutex);
+    if (m_iScheduleEepromWrite > 0)
+      m_com->LIB_CEC->AddLog(CEC_LOG_WARNING, "write thread stopped while a write was queued");
+    m_condition.Signal();
+  }
+  StopThread();
+}
+
+void *CAdapterEepromWriteThread::Process(void)
+{
+  while (!IsStopped())
+  {
+    CLockObject lock(m_mutex);
+    if ((m_iScheduleEepromWrite > 0 && m_iScheduleEepromWrite < GetTimeMs()) ||
+        m_condition.Wait(m_mutex, m_bWrite, 100))
+    {
+      m_bWrite = false;
+      if (m_com->m_commands->WriteEEPROM())
+      {
+        m_iLastEepromWrite = GetTimeMs();
+        m_iScheduleEepromWrite = 0;
+      }
+      else
+      {
+        m_iScheduleEepromWrite = GetTimeMs() + CEC_ADAPTER_EEPROM_WRITE_RETRY;
+      }
+    }
+  }
+  return NULL;
+}
+
+bool CAdapterEepromWriteThread::Write(void)
+{
+  CLockObject lock(m_mutex);
+  if (m_iScheduleEepromWrite == 0)
+  {
+    int64_t iNow = GetTimeMs();
+    if (m_iLastEepromWrite + CEC_ADAPTER_EEPROM_WRITE_INTERVAL > iNow)
+    {
+      m_com->LIB_CEC->AddLog(CEC_LOG_DEBUG, "delaying eeprom write by %ld ms", m_iLastEepromWrite + CEC_ADAPTER_EEPROM_WRITE_INTERVAL - iNow);
+      m_iScheduleEepromWrite = m_iLastEepromWrite + CEC_ADAPTER_EEPROM_WRITE_INTERVAL;
+    }
+    else
+    {
+      m_bWrite = true;
+      m_condition.Signal();
+    }
+  }
+  return true;
 }

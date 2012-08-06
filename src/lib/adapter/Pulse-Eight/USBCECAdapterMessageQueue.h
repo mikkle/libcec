@@ -31,14 +31,15 @@
  *     http://www.pulse-eight.net/
  */
 
-#include "USBCECAdapterMessage.h"
-#include "../platform/threads/threads.h"
+#include "lib/platform/threads/threads.h"
+#include "lib/platform/util/buffer.h"
 #include <map>
 
 namespace CEC
 {
   class CUSBCECAdapterCommunication;
   class CCECAdapterMessageQueue;
+  class CCECAdapterMessage;
 
   class CCECAdapterMessageQueueEntry
   {
@@ -81,6 +82,7 @@ namespace CEC
      * @return True when it's a response, false otherwise.
      */
     bool IsResponse(const CCECAdapterMessage &msg);
+    bool IsResponseOld(const CCECAdapterMessage &msg);
 
     /*!
      * @return The command that was sent in human readable form.
@@ -113,6 +115,8 @@ namespace CEC
      */
     void Signal(void);
 
+    bool ProvidesExtendedResponse(void);
+
     CCECAdapterMessageQueue *  m_queue;
     CCECAdapterMessage *       m_message;      /**< the message that was sent */
     uint8_t                    m_iPacketsLeft; /**< the amount of acks that we're waiting on */
@@ -133,14 +137,7 @@ namespace CEC
      * @param com The communication handler callback to use.
      * @param iQueueSize The outgoing message queue size.
      */
-    CCECAdapterMessageQueue(CUSBCECAdapterCommunication *com) :
-      PLATFORM::CThread(),
-      m_com(com),
-      m_iNextMessage(0)
-    {
-      m_currentCECFrame.Clear();
-    }
-
+    CCECAdapterMessageQueue(CUSBCECAdapterCommunication *com);
     virtual ~CCECAdapterMessageQueue(void);
 
     /*!
@@ -168,6 +165,8 @@ namespace CEC
      */
     bool Write(CCECAdapterMessage *msg);
 
+    bool ProvidesExtendedResponse(void);
+
     virtual void *Process(void);
 
   private:
@@ -176,7 +175,7 @@ namespace CEC
     std::map<uint64_t, CCECAdapterMessageQueueEntry *>     m_messages;               /**< the outgoing message queue */
     PLATFORM::SyncedBuffer<CCECAdapterMessageQueueEntry *> m_writeQueue;             /**< the queue for messages that are to be written */
     uint64_t                                               m_iNextMessage;           /**< the index of the next message */
-    CCECAdapterMessage                                     m_incomingAdapterMessage; /**< the current incoming message that's being assembled */
+    CCECAdapterMessage                                    *m_incomingAdapterMessage; /**< the current incoming message that's being assembled */
     cec_command                                            m_currentCECFrame;        /**< the current incoming CEC command that's being assembled */
   };
 }

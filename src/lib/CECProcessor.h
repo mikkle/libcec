@@ -32,7 +32,6 @@
  */
 
 #include <string>
-#include "../../include/cectypes.h"
 
 #include "platform/threads/threads.h"
 #include "platform/util/buffer.h"
@@ -89,7 +88,6 @@ namespace CEC
       cec_logical_address   GetActiveSource(bool bRequestActiveSource = true);
       bool                  IsActiveSource(cec_logical_address iAddress);
       bool                  CECInitialised(void);
-      bool                  SetStreamPath(uint16_t iPhysicalAddress);
 
       bool                  StandbyDevices(const cec_logical_address initiator, const CECDEVICEVEC &devices);
       bool                  StandbyDevice(const cec_logical_address initiator, cec_logical_address address);
@@ -109,7 +107,7 @@ namespace CEC
 
       bool SetLineTimeout(uint8_t iTimeout);
 
-      bool Transmit(const cec_command &data);
+      bool Transmit(const cec_command &data, bool bIsReply);
       void TransmitAbort(cec_logical_address source, cec_logical_address destination, cec_opcode opcode, cec_abort_reason reason = CEC_ABORT_REASON_UNRECOGNIZED_OPCODE);
 
       bool StartBootloader(const char *strPort = NULL);
@@ -126,16 +124,20 @@ namespace CEC
 
       bool IsHandledByLibCEC(const cec_logical_address address) const;
 
-      bool TryLogicalAddress(cec_logical_address address);
+      bool TryLogicalAddress(cec_logical_address address, cec_version libCECSpecVersion = CEC_VERSION_1_4);
 
       bool IsRunningLatestFirmware(void);
-  private:
+      void SwitchMonitoring(bool bSwitchTo);
+
+    private:
       bool OpenConnection(const char *strPort, uint16_t iBaudRate, uint32_t iTimeoutMs, bool bStartListening = true);
       void SetCECInitialised(bool bSetTo = true);
 
       void ReplaceHandlers(void);
       bool PhysicalAddressInUse(uint16_t iPhysicalAddress);
-      bool SetAckMask(uint16_t iMask);
+
+      bool ClearLogicalAddresses(void);
+      bool SetLogicalAddresses(const cec_logical_addresses &addresses);
 
       void LogOutput(const cec_command &data);
       void ProcessCommand(const cec_command &command);
@@ -152,5 +154,6 @@ namespace CEC
       CCECInputBuffer                             m_inBuffer;
       CCECDeviceMap *                             m_busDevices;
       std::map<cec_logical_address, CCECClient *> m_clients;
+      bool                                        m_bMonitor;
   };
 };

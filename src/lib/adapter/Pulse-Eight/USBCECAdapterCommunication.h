@@ -31,11 +31,8 @@
  *     http://www.pulse-eight.net/
  */
 
-#include "../../../include/cectypes.h"
-#include "../platform/threads/threads.h"
-#include "../platform/util/buffer.h"
-#include "AdapterCommunication.h"
-#include "USBCECAdapterMessage.h"
+#include "lib/platform/threads/threads.h"
+#include "lib/adapter/AdapterCommunication.h"
 
 namespace PLATFORM
 {
@@ -46,13 +43,16 @@ namespace CEC
 {
   class CCECProcessor;
   class CAdapterPingThread;
+  class CAdapterEepromWriteThread;
   class CUSBCECAdapterCommands;
   class CCECAdapterMessageQueue;
+  class CCECAdapterMessage;
 
   class CUSBCECAdapterCommunication : public IAdapterCommunication, public PLATFORM::CThread
   {
     friend class CUSBCECAdapterCommands;
     friend class CCECAdapterMessageQueue;
+    friend class CAdapterEepromWriteThread;
 
   public:
     /*!
@@ -69,22 +69,26 @@ namespace CEC
     bool Open(uint32_t iTimeoutMs = CEC_DEFAULT_CONNECT_TIMEOUT, bool bSkipChecks = false, bool bStartListening = true);
     void Close(void);
     bool IsOpen(void);
-    CStdString GetError(void) const;
-    cec_adapter_message_state Write(const cec_command &data, bool &bRetry, uint8_t iLineTimeout = 3);
+    std::string GetError(void) const;
+    cec_adapter_message_state Write(const cec_command &data, bool &bRetry, uint8_t iLineTimeout, bool bIsReply);
 
     bool StartBootloader(void);
-    bool SetAckMask(uint16_t iMask);
-    uint16_t GetAckMask(void);
+    bool SetLogicalAddresses(const cec_logical_addresses &addresses);
+    cec_logical_addresses GetLogicalAddresses(void);
     bool PingAdapter(void);
     uint16_t GetFirmwareVersion(void);
     uint32_t GetFirmwareBuildDate(void);
     bool IsRunningLatestFirmware(void);
     bool PersistConfiguration(const libcec_configuration &configuration);
     bool GetConfiguration(libcec_configuration &configuration);
-    CStdString GetPortName(void);
+    std::string GetPortName(void);
     uint16_t GetPhysicalAddress(void);
     bool SetControlledMode(bool controlled);
+    cec_vendor_id GetVendorId(void) { return CEC_VENDOR_UNKNOWN; }
+    bool SupportsSourceLogicalAddress(const cec_logical_address UNUSED(address)) { return true; }
     ///}
+
+    bool ProvidesExtendedResponse(void);
 
     void *Process(void);
 
@@ -169,9 +173,32 @@ namespace CEC
     bool                                         m_bInitialised;         /**< true when the connection is initialised, false otherwise */
     bool                                         m_bWaitingForAck[15];   /**< array in which we store from which devices we're expecting acks */
     CAdapterPingThread *                         m_pingThread;           /**< ping thread, that pings the adapter every 15 seconds */
+    CAdapterEepromWriteThread *                  m_eepromWriteThread;    /**< eeprom writes are done async */
     CUSBCECAdapterCommands *                     m_commands;             /**< commands that can be sent to the adapter */
     CCECAdapterMessageQueue *                    m_adapterMessageQueue;  /**< the incoming and outgoing message queue */
-    uint16_t                                     m_iAckMask;
+    cec_logical_addresses                        m_logicalAddresses;     /**< the logical address list that this instance is using */
+  };
+
+  class CAdapterEepromWriteThread : public PLATFORM::CThread
+  {
+  public:
+    CAdapterEepromWriteThread(CUSBCECAdapterCommunication *com) :
+        m_com(com),
+        m_bWrite(false),
+        m_iLastEepromWrite(0),
+        m_iScheduleEepromWrite(0) {}
+    virtual ~CAdapterEepromWriteThread(void) {}
+
+    bool Write(void);
+    void* Process(void);
+    void Stop(void);
+  private:
+    CUSBCECAdapterCommunication *m_com;
+    bool                         m_bWrite;
+    PLATFORM::CCondition<bool>   m_condition;
+    PLATFORM::CMutex             m_mutex;
+    int64_t                      m_iLastEepromWrite;     /**< last time that this instance did an eeprom write */
+    int64_t                      m_iScheduleEepromWrite; /**< in case there were more than 2 changes within 30 seconds, do another write at this time */
   };
 
   class CAdapterPingThread : public PLATFORM::CThread
@@ -182,7 +209,7 @@ namespace CEC
         m_timeout(iTimeout){}
     virtual ~CAdapterPingThread(void) {}
 
-    virtual void* Process(void);
+    void* Process(void);
   private:
     CUSBCECAdapterCommunication *m_com;
     PLATFORM::CTimeout           m_timeout;

@@ -30,14 +30,15 @@
  *     http://www.pulse-eight.net/
  */
 
-#include "../sockets/serialport.h"
-#include "../util/baudrate.h"
-#include "../util/timeutils.h"
+#include "env.h"
+#include "lib/platform/sockets/serialport.h"
+#include "lib/platform/util/baudrate.h"
+#include "lib/platform/util/timeutils.h"
 
 using namespace std;
 using namespace PLATFORM;
 
-void FormatWindowsError(int iErrorCode, CStdString &strMessage)
+void FormatWindowsError(int iErrorCode, std::string &strMessage)
 {
   if (iErrorCode != ERROR_SUCCESS)
   {
@@ -99,7 +100,17 @@ void CSerialSocket::Shutdown(void)
 
 ssize_t CSerialSocket::Write(void* data, size_t len)
 {
-  return IsOpen() ? SerialSocketWrite(m_socket, &m_iError, data, len) : -1;
+  if (IsOpen())
+  {
+    ssize_t iReturn = SerialSocketWrite(m_socket, &m_iError, data, len);
+    if (iReturn != len)
+    {
+      m_strError = "unable to write to the serial port";
+      FormatWindowsError(GetLastError(), m_strError);
+    }
+    return iReturn;
+  }
+  return -1;
 }
 
 ssize_t CSerialSocket::Read(void* data, size_t len, uint64_t iTimeoutMs /* = 0 */)
@@ -119,7 +130,7 @@ bool CSerialSocket::Open(uint64_t iTimeoutMs /* = 0 */)
   if (IsOpen())
     return false;
 
-  CStdString strComPath = "\\\\.\\" + m_strName;
+  std::string strComPath = "\\\\.\\" + m_strName;
   CLockObject lock(m_mutex);
   m_socket = CreateFile(strComPath.c_str(), GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
   if (m_socket == INVALID_HANDLE_VALUE)
@@ -168,6 +179,7 @@ bool CSerialSocket::Open(uint64_t iTimeoutMs /* = 0 */)
     return false;
   }
 
+  m_strError.clear();
   m_bIsOpen = true;
   return m_bIsOpen;
 }
