@@ -157,7 +157,7 @@ bool ProcessConsoleCommand(string &input)
 bool OpenConnection(cec_device_type type = CEC_DEVICE_TYPE_RECORDING_DEVICE)
 {
   g_config.Clear();
-  snprintf(g_config.strDeviceName, 13, "CEC-config");
+  snprintf(g_config.strDeviceName, 13, "XBMC");
   g_config.callbackParam      = NULL;
   g_config.clientVersion      = (uint32_t)CEC_CLIENT_VERSION_1_8_1;
   g_callbacks.CBCecLogMessage = &CecLogMessage;
