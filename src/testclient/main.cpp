@@ -39,6 +39,7 @@
 #include <fstream>
 #include <string>
 #include <sstream>
+#include <signal.h>
 #include "../lib/platform/os.h"
 #include "../lib/implementations/CECCommandHandler.h"
 #include "../lib/platform/util/StdString.h"
@@ -47,9 +48,9 @@ using namespace CEC;
 using namespace std;
 using namespace PLATFORM;
 
-#define CEC_CONFIG_VERSION CEC_CLIENT_VERSION_1_8_1;
+#define CEC_CONFIG_VERSION CEC_CLIENT_VERSION_1_9_0;
 
-#include <cecloader.h>
+#include "../../include/cecloader.h"
 
 ICECCallbacks        g_callbacks;
 libcec_configuration g_config;
@@ -224,7 +225,12 @@ void ListDevices(ICECAdapter *parser)
           time_t buildTime = (time_t)config.iFirmwareBuildDate;
           strDeviceInfo.AppendFormat("firmware build date: %s", asctime(gmtime(&buildTime)));
           strDeviceInfo = strDeviceInfo.Left(strDeviceInfo.length() > 1 ? (unsigned)(strDeviceInfo.length() - 1) : 0); // strip \n added by asctime
-          strDeviceInfo.append(" +0000");
+          strDeviceInfo.append(" +0000\n");
+        }
+
+        if (config.adapterType != ADAPTERTYPE_UNKNOWN)
+        {
+          strDeviceInfo.AppendFormat("type:                %s\n", parser->ToString(config.adapterType));
         }
       }
       strDeviceInfo.append("\n");
@@ -649,7 +655,7 @@ bool ProcessCommandVEN(ICECAdapter *parser, const string &command, string &argum
       if (iDev >= 0 && iDev < 15)
       {
         uint64_t iVendor = parser->GetDeviceVendorId((cec_logical_address) iDev);
-        PrintToStdOut("vendor id: %06x", iVendor);
+        PrintToStdOut("vendor id: %06llx", iVendor);
         return true;
       }
     }
@@ -1124,8 +1130,20 @@ bool ProcessCommandLineArguments(int argc, char *argv[])
   return bReturn;
 }
 
+void sighandler(int iSignal)
+{
+  PrintToStdOut("signal caught: %d - exiting", iSignal);
+  g_bExit = true;
+}
+
 int main (int argc, char *argv[])
 {
+  if (signal(SIGINT, sighandler) == SIG_ERR)
+  {
+    PrintToStdOut("can't register sighandler");
+    return -1;
+  }
+
   g_config.Clear();
   g_callbacks.Clear();
   snprintf(g_config.strDeviceName, 13, "CECTester");

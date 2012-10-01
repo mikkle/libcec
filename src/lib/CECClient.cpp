@@ -47,6 +47,9 @@ using namespace PLATFORM;
 #define LIB_CEC     m_processor->GetLib()
 #define ToString(x) CCECTypeUtils::ToString(x)
 
+#define COMBO_KEY        CEC_USER_CONTROL_CODE_STOP
+#define COMBO_TIMEOUT_MS 1000
+
 CCECClient::CCECClient(CCECProcessor *processor, const libcec_configuration &configuration) :
     m_processor(processor),
     m_bInitialised(false),
@@ -802,6 +805,14 @@ bool CCECClient::GetCurrentConfiguration(libcec_configuration &configuration)
     configuration.bMonitorOnly            = m_configuration.bMonitorOnly;
   }
 
+  // client version 1.8.0
+  if (configuration.clientVersion >= CEC_CLIENT_VERSION_1_8_0)
+    configuration.cecVersion              = m_configuration.cecVersion;
+
+  // client version 1.8.2
+  if (configuration.clientVersion >= CEC_CLIENT_VERSION_1_8_2)
+    configuration.adapterType             = m_configuration.adapterType;
+
   return true;
 }
 
@@ -858,6 +869,14 @@ bool CCECClient::SetConfiguration(const libcec_configuration &configuration)
     {
       m_configuration.bMonitorOnly = configuration.bMonitorOnly;
     }
+
+    // client version 1.8.0
+    if (configuration.clientVersion >= CEC_CLIENT_VERSION_1_8_0)
+      m_configuration.cecVersion   = configuration.cecVersion;
+
+    // client version 1.8.2
+    if (configuration.clientVersion >= CEC_CLIENT_VERSION_1_8_2)
+      m_configuration.adapterType  = configuration.adapterType;
 
     // ensure that there is at least 1 device type set
     if (m_configuration.deviceTypes.IsEmpty())
@@ -930,7 +949,7 @@ int CCECClient::MenuStateChanged(const cec_menu_state newState)
   return CallbackMenuStateChanged(newState);
 }
 
-void CCECClient::AddKey(void)
+void CCECClient::AddKey(bool bSendComboKey /* = false */)
 {
   cec_keypress key;
   key.keycode = CEC_USER_CONTROL_CODE_UNKNOWN;
@@ -940,10 +959,14 @@ void CCECClient::AddKey(void)
     if (m_iCurrentButton != CEC_USER_CONTROL_CODE_UNKNOWN)
     {
       key.duration = (unsigned int) (GetTimeMs() - m_buttontime);
-      key.keycode = m_iCurrentButton;
 
-      m_iCurrentButton = CEC_USER_CONTROL_CODE_UNKNOWN;
-      m_buttontime = 0;
+      if (key.duration > COMBO_TIMEOUT_MS || m_iCurrentButton != COMBO_KEY || bSendComboKey)
+      {
+        key.keycode = m_iCurrentButton;
+
+        m_iCurrentButton = CEC_USER_CONTROL_CODE_UNKNOWN;
+        m_buttontime = 0;
+      }
     }
   }
 
@@ -956,14 +979,39 @@ void CCECClient::AddKey(void)
 
 void CCECClient::AddKey(const cec_keypress &key)
 {
+  // send back the previous key if there is one
+  AddKey();
+
+  cec_keypress transmitKey(key);
+
   {
     CLockObject lock(m_mutex);
-    m_iCurrentButton = key.duration > 0 ? CEC_USER_CONTROL_CODE_UNKNOWN : key.keycode;
-    m_buttontime = key.duration > 0 ? 0 : GetTimeMs();
+    if (key.duration > 0 || key.keycode > CEC_USER_CONTROL_CODE_MAX)
+    {
+      transmitKey.keycode = CEC_USER_CONTROL_CODE_UNKNOWN;
+    }
+    else if (m_iCurrentButton == COMBO_KEY)
+    {
+      // stop + ok -> exit
+      if (key.keycode == CEC_USER_CONTROL_CODE_SELECT)
+        transmitKey.keycode = CEC_USER_CONTROL_CODE_EXIT;
+      // stop + pause -> root menu
+      else if (key.keycode == CEC_USER_CONTROL_CODE_ROOT_MENU)
+        transmitKey.keycode = CEC_USER_CONTROL_CODE_ROOT_MENU;
+      // stop + play -> dot (which is handled as context menu in xbmc)
+      else if (key.keycode == CEC_USER_CONTROL_CODE_PLAY)
+        transmitKey.keycode = CEC_USER_CONTROL_CODE_DOT;
+      // default, send back the previous key
+      else
+        AddKey(true);
+    }
+
+    m_iCurrentButton = transmitKey.keycode;
+    m_buttontime = m_iCurrentButton == CEC_USER_CONTROL_CODE_UNKNOWN || key.duration > 0 ? 0 : GetTimeMs();
   }
 
-  LIB_CEC->AddLog(CEC_LOG_DEBUG, "key pressed: %s (%1x)", ToString(key.keycode), key.keycode);
-  CallbackAddKey(key);
+  LIB_CEC->AddLog(CEC_LOG_DEBUG, "key pressed: %s (%1x)", ToString(transmitKey.keycode), transmitKey.keycode);
+  CallbackAddKey(transmitKey);
 }
 
 void CCECClient::SetCurrentButton(const cec_user_control_code iButtonCode)
@@ -985,7 +1033,8 @@ void CCECClient::CheckKeypressTimeout(void)
     uint64_t iNow = GetTimeMs();
 
     if (m_iCurrentButton != CEC_USER_CONTROL_CODE_UNKNOWN &&
-        iNow - m_buttontime > CEC_BUTTON_TIMEOUT)
+          ((m_iCurrentButton == COMBO_KEY && iNow - m_buttontime > COMBO_TIMEOUT_MS) ||
+          (m_iCurrentButton != COMBO_KEY && iNow - m_buttontime > CEC_BUTTON_TIMEOUT)))
     {
       key.duration = (unsigned int) (iNow - m_buttontime);
       key.keycode = m_iCurrentButton;

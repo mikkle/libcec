@@ -510,6 +510,8 @@ namespace CEC
         return "Vizio";
       case CEC_VENDOR_BROADCOM:
         return "Broadcom";
+      case CEC_VENDOR_LOEWE:
+        return "Loewe";
       default:
         return "Unknown";
       }
@@ -547,6 +549,10 @@ namespace CEC
         return "1.8.0";
       case CEC_CLIENT_VERSION_1_8_1:
         return "1.8.1";
+      case CEC_CLIENT_VERSION_1_8_2:
+        return "1.8.2";
+      case CEC_CLIENT_VERSION_1_9_0:
+        return "1.9.0";
       default:
         return "Unknown";
       }
@@ -584,6 +590,10 @@ namespace CEC
         return "1.8.0";
       case CEC_SERVER_VERSION_1_8_1:
         return "1.8.1";
+      case CEC_SERVER_VERSION_1_8_2:
+        return "1.8.2";
+      case CEC_SERVER_VERSION_1_9_0:
+        return "1.9.0";
       default:
         return "Unknown";
       }
@@ -772,6 +782,21 @@ namespace CEC
         return "return (Samsung)";
       case CEC_USER_CONTROL_CODE_AN_CHANNELS_LIST:
         return "channels list (Samsung)";
+      default:
+        return "unknown";
+      }
+    }
+
+    static const char *ToString(const cec_adapter_type type)
+    {
+      switch (type)
+      {
+      case ADAPTERTYPE_P8_EXTERNAL:
+        return "Pulse-Eight USB-CEC Adapter";
+      case ADAPTERTYPE_P8_DAUGHTERBOARD:
+        return "Pulse-Eight USB-CEC Daughterboard";
+      case ADAPTERTYPE_RPI:
+        return "Raspberry Pi";
       default:
         return "unknown";
       }
