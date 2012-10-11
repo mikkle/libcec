@@ -553,6 +553,12 @@ namespace CEC
         return "1.8.2";
       case CEC_CLIENT_VERSION_1_9_0:
         return "1.9.0";
+      case CEC_CLIENT_VERSION_1_99_0:
+        return "2.0.0-pre";
+      case CEC_CLIENT_VERSION_2_0_0:
+        return "2.0.0";
+      case CEC_CLIENT_VERSION_2_0_1:
+        return "2.0.1";
       default:
         return "Unknown";
       }
@@ -594,6 +600,12 @@ namespace CEC
         return "1.8.2";
       case CEC_SERVER_VERSION_1_9_0:
         return "1.9.0";
+      case CEC_SERVER_VERSION_1_99_0:
+        return "2.0.0-pre";
+      case CEC_CLIENT_VERSION_2_0_0:
+        return "2.0.0";
+      case CEC_CLIENT_VERSION_2_0_1:
+        return "2.0.1";
       default:
         return "Unknown";
       }
@@ -797,6 +809,8 @@ namespace CEC
         return "Pulse-Eight USB-CEC Daughterboard";
       case ADAPTERTYPE_RPI:
         return "Raspberry Pi";
+      case ADAPTERTYPE_TDA995x:
+        return "TDA995x";
       default:
         return "unknown";
       }

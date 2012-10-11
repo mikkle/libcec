@@ -45,6 +45,8 @@
 #define VL_POWERED_DOWN 0x01
 #define VL_UNKNOWN1     0x06
 
+#define VL_REQUEST_POWER_STATUS_TIMEOUT 5000
+
 using namespace CEC;
 using namespace PLATFORM;
 
@@ -61,7 +63,8 @@ CVLCommandHandler::CVLCommandHandler(CCECBusDevice *busDevice,
                                      int64_t iActiveSourcePending /* = 0 */) :
     CCECCommandHandler(busDevice, iTransmitTimeout, iTransmitWait, iTransmitRetries, iActiveSourcePending),
     m_iPowerUpEventReceived(0),
-    m_bCapabilitiesSent(false)
+    m_bCapabilitiesSent(false),
+    m_iPowerStatusRequested(0)
 {
   m_vendorId = CEC_VENDOR_PANASONIC;
 }
@@ -90,6 +93,9 @@ bool CVLCommandHandler::InitHandler(void)
 
 int CVLCommandHandler::HandleDeviceVendorCommandWithId(const cec_command &command)
 {
+  if (!m_processor->IsHandledByLibCEC(command.destination))
+    return CEC_ABORT_REASON_INVALID_OPERAND;
+
   if (command.parameters[0] != 0x00 ||
       command.parameters[1] != 0x80 ||
       command.parameters[2] != 0x45)
@@ -158,8 +164,11 @@ bool CVLCommandHandler::PowerUpEventReceived(void)
 
   if (m_busDevice->GetLogicalAddress() != CECDEVICE_TV)
   {
+    CCECBusDevice* tv = m_processor->GetTV();
+    if (tv && tv->GetStatus() != CEC_DEVICE_STATUS_PRESENT)
+      return true;
+
     // get the status from the TV
-    CCECBusDevice *tv = m_processor->GetTV();
     if (tv && tv->GetCurrentVendorId() == CEC_VENDOR_PANASONIC)
     {
       CVLCommandHandler *handler = static_cast<CVLCommandHandler *>(tv->GetHandler());
@@ -204,7 +213,7 @@ void CVLCommandHandler::VendorPreActivateSourceHook(void)
   bool bTransmit(false);
   {
     CLockObject lock(m_mutex);
-    bTransmit = m_bCapabilitiesSent;
+    bTransmit = !m_bCapabilitiesSent;
   }
   if (bTransmit)
     SendVendorCommandCapabilities(m_processor->GetLogicalAddress(), CECDEVICE_TV);
@@ -233,7 +242,8 @@ int CVLCommandHandler::HandleVendorCommand(const cec_command &command)
   if (command.parameters.size == 3 &&
       command.parameters[0] == 0x10 &&
       command.parameters[1] == 0x01 &&
-      command.parameters[2] == 0x05)
+      command.parameters[2] == 0x05 &&
+      m_processor->IsHandledByLibCEC(command.destination))
   {
     SendVendorCommandCapabilities(m_processor->GetLogicalAddress(), command.initiator);
     return COMMAND_HANDLED;
@@ -242,8 +252,18 @@ int CVLCommandHandler::HandleVendorCommand(const cec_command &command)
   return CEC_ABORT_REASON_INVALID_OPERAND;
 }
 
+bool CVLCommandHandler::TransmitRequestPowerStatus(const cec_logical_address iInitiator, const cec_logical_address iDestination, bool bWaitForResponse /* = true */)
+{
+  m_iPowerStatusRequested = GetTimeMs();
+  return CCECCommandHandler::TransmitRequestPowerStatus(iInitiator, iDestination, bWaitForResponse);
+}
+
 bool CVLCommandHandler::SourceSwitchAllowed(void)
 {
+  int64_t now(GetTimeMs());
+  if (!PowerUpEventReceived() && now - m_iPowerStatusRequested > VL_REQUEST_POWER_STATUS_TIMEOUT)
+    TransmitRequestPowerStatus(m_processor->GetPrimaryDevice()->GetLogicalAddress(), CECDEVICE_TV, false);
+
   return PowerUpEventReceived();
 }
 
