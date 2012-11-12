@@ -673,13 +673,15 @@ int CCECCommandHandler::HandleUserControlPressed(const cec_command &command)
     client->SetCurrentButton((cec_user_control_code) command.parameters[0]);
 
   if (command.parameters[0] == CEC_USER_CONTROL_CODE_POWER ||
-      command.parameters[0] == CEC_USER_CONTROL_CODE_POWER_ON_FUNCTION)
+      command.parameters[0] == CEC_USER_CONTROL_CODE_POWER_ON_FUNCTION||
+      command.parameters[0] == CEC_USER_CONTROL_CODE_POWER_TOGGLE_FUNCTION)
   {
     bool bPowerOn(true);
 
-    // CEC_USER_CONTROL_CODE_POWER operates as a toggle
+    // CEC_USER_CONTROL_CODE_POWER and CEC_USER_CONTROL_CODE_POWER_TOGGLE_FUNCTION operate as a toggle
     // assume CEC_USER_CONTROL_CODE_POWER_ON_FUNCTION does not
-    if (command.parameters[0] == CEC_USER_CONTROL_CODE_POWER)
+    if (command.parameters[0] == CEC_USER_CONTROL_CODE_POWER ||
+        command.parameters[0] == CEC_USER_CONTROL_CODE_POWER_TOGGLE_FUNCTION)
     {
       cec_power_status status = device->GetCurrentPowerStatus();
       bPowerOn = !(status == CEC_POWER_STATUS_ON || status == CEC_POWER_STATUS_IN_TRANSITION_STANDBY_TO_ON);
@@ -695,6 +697,12 @@ int CCECCommandHandler::HandleUserControlPressed(const cec_command &command)
       device->TransmitInactiveSource();
       device->SetMenuState(CEC_MENU_STATE_DEACTIVATED);
     }
+  }
+  else if (command.parameters[0] != CEC_USER_CONTROL_CODE_POWER_OFF_FUNCTION)
+  {
+    // we're not marked as active source, but the tv sends keypresses to us, so assume it forgot to activate us
+    if (!device->IsActiveSource() && command.initiator == CECDEVICE_TV)
+      device->ActivateSource();
   }
 
   return COMMAND_HANDLED;
@@ -716,6 +724,15 @@ int CCECCommandHandler::HandleUserControlRelease(const cec_command &command)
 int CCECCommandHandler::HandleVendorCommand(const cec_command & UNUSED(command))
 {
   return CEC_ABORT_REASON_INVALID_OPERAND;
+}
+
+int CCECCommandHandler::HandleVendorRemoteButtonDown(const cec_command& command)
+{
+  if (command.parameters.size == 0)
+    return CEC_ABORT_REASON_INVALID_OPERAND;
+
+  LIB_CEC->AddLog(CEC_LOG_NOTICE, "unhandled vendor remote button received with keycode %x", command.parameters[0]);
+  return COMMAND_HANDLED;
 }
 
 void CCECCommandHandler::UnhandledCommand(const cec_command &command, const cec_abort_reason reason)

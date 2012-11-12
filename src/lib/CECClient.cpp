@@ -954,7 +954,7 @@ void CCECClient::AddKey(const cec_keypress &key)
       if (key.keycode == CEC_USER_CONTROL_CODE_SELECT)
         transmitKey.keycode = CEC_USER_CONTROL_CODE_EXIT;
       // stop + pause -> root menu
-      else if (key.keycode == CEC_USER_CONTROL_CODE_ROOT_MENU)
+      else if (key.keycode == CEC_USER_CONTROL_CODE_PAUSE)
         transmitKey.keycode = CEC_USER_CONTROL_CODE_ROOT_MENU;
       // stop + play -> dot (which is handled as context menu in xbmc)
       else if (key.keycode == CEC_USER_CONTROL_CODE_PLAY)
@@ -964,8 +964,11 @@ void CCECClient::AddKey(const cec_keypress &key)
         AddKey(true);
     }
 
-    m_iCurrentButton = transmitKey.keycode;
-    m_buttontime = m_iCurrentButton == CEC_USER_CONTROL_CODE_UNKNOWN || key.duration > 0 ? 0 : GetTimeMs();
+    if (key.duration == 0)
+    {
+      m_iCurrentButton = transmitKey.keycode;
+      m_buttontime = m_iCurrentButton == CEC_USER_CONTROL_CODE_UNKNOWN || key.duration > 0 ? 0 : GetTimeMs();
+    }
   }
 
   if (key.keycode != COMBO_KEY || key.duration > 0)
