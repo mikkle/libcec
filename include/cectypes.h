@@ -265,6 +265,11 @@ namespace CEC {
 #define CEC_FORWARD_STANDBY_MIN_INTERVAL 10000
 
 /*!
+ * default timeout in milliseconds for combo keys
+ */
+#define CEC_DEFAULT_COMBO_TIMEOUT_MS 1000
+
+/*!
  * the virtual device path to use for the Raspberry Pi's CEC wire
  */
 #define CEC_RPI_VIRTUAL_PATH           "Raspberry Pi"
@@ -309,6 +314,8 @@ namespace CEC {
 #define MSGESC                       0xFD
 #define ESCOFFSET                    3
 
+// defines to make compile time checks for certain features easy
+#define CEC_FEATURE_CONFIGURABLE_COMBO_KEY 1
 
 typedef enum cec_abort_reason
 {
@@ -691,7 +698,7 @@ typedef enum cec_user_control_code
   CEC_USER_CONTROL_CODE_AN_RETURN                   = 0x91,
   CEC_USER_CONTROL_CODE_AN_CHANNELS_LIST            = 0x96,
   CEC_USER_CONTROL_CODE_MAX                         = 0x96,
-  CEC_USER_CONTROL_CODE_UNKNOWN
+  CEC_USER_CONTROL_CODE_UNKNOWN                     = 0xFF
 } cec_user_control_code;
 
 typedef enum cec_logical_address
@@ -1256,7 +1263,8 @@ typedef enum libcec_alert
   CEC_ALERT_SERVICE_DEVICE,
   CEC_ALERT_CONNECTION_LOST,
   CEC_ALERT_PERMISSION_ERROR,
-  CEC_ALERT_PORT_BUSY
+  CEC_ALERT_PORT_BUSY,
+  CEC_ALERT_PHYSICAL_ADDRESS_ERROR
 } libcec_alert;
 
 typedef enum libcec_parameter_type
@@ -1377,6 +1385,9 @@ typedef enum cec_client_version
   CEC_CLIENT_VERSION_2_0_1   = 0x2001,
   CEC_CLIENT_VERSION_2_0_2   = 0x2002,
   CEC_CLIENT_VERSION_2_0_3   = 0x2003,
+  CEC_CLIENT_VERSION_2_0_4   = 0x2004,
+  CEC_CLIENT_VERSION_2_0_5   = 0x2005,
+  CEC_CLIENT_VERSION_CURRENT = 0x2005
 } cec_client_version;
 
 typedef enum cec_server_version
@@ -1402,6 +1413,9 @@ typedef enum cec_server_version
   CEC_SERVER_VERSION_2_0_1   = 0x2001,
   CEC_SERVER_VERSION_2_0_2   = 0x2002,
   CEC_SERVER_VERSION_2_0_3   = 0x2003,
+  CEC_SERVER_VERSION_2_0_4   = 0x2004,
+  CEC_SERVER_VERSION_2_0_5   = 0x2005,
+  CEC_SERVER_VERSION_CURRENT = 0x2005
 } cec_server_version;
 
 struct libcec_configuration
@@ -1440,6 +1454,8 @@ struct libcec_configuration
   cec_version           cecVersion;           /*!< CEC spec version to use by libCEC. defaults to v1.4. added in 1.8.0 */
   cec_adapter_type      adapterType;          /*!< type of the CEC adapter that we're connected to. added in 1.8.2 */
   uint8_t               iDoubleTapTimeoutMs;  /*!< prevent double taps withing this timeout. defaults to 200ms. added in 2.0.0 */
+  cec_user_control_code comboKey;             /*!< key code that initiates combo keys. defaults to CEC_USER_CONTROL_CODE_F1_BLUE. CEC_USER_CONTROL_CODE_UNKNOWN to disable. added in 2.0.5 */
+  uint32_t              iComboKeyTimeoutMs;   /*!< timeout until the combo key is sent as normal keypress */
 
 #ifdef __cplusplus
    libcec_configuration(void) { Clear(); }
@@ -1473,7 +1489,9 @@ struct libcec_configuration
                   bMonitorOnly              == other.bMonitorOnly &&
                   cecVersion                == other.cecVersion &&
                   adapterType               == other.adapterType &&
-                  iDoubleTapTimeoutMs       == other.iDoubleTapTimeoutMs);
+                  iDoubleTapTimeoutMs       == other.iDoubleTapTimeoutMs &&
+                  (other.clientVersion <= CEC_CLIENT_VERSION_2_0_4 || comboKey           == other.comboKey) &&
+                  (other.clientVersion <= CEC_CLIENT_VERSION_2_0_4 || iComboKeyTimeoutMs == other.iComboKeyTimeoutMs));
   }
 
   bool operator!=(const libcec_configuration &other) const
@@ -1490,8 +1508,8 @@ struct libcec_configuration
     baseDevice = (cec_logical_address)CEC_DEFAULT_BASE_DEVICE;
     iHDMIPort =                       CEC_DEFAULT_HDMI_PORT;
     tvVendor =              (uint64_t)CEC_VENDOR_UNKNOWN;
-    clientVersion =         (uint32_t)CEC_CLIENT_VERSION_2_0_0;
-    serverVersion =         (uint32_t)CEC_SERVER_VERSION_2_0_0;
+    clientVersion =         (uint32_t)CEC_CLIENT_VERSION_CURRENT;
+    serverVersion =         (uint32_t)CEC_SERVER_VERSION_CURRENT;
     bAutodetectAddress =              0;
     bGetSettingsFromROM =             CEC_DEFAULT_SETTING_GET_SETTINGS_FROM_ROM;
     bUseTVMenuLanguage =              CEC_DEFAULT_SETTING_USE_TV_MENU_LANGUAGE;
@@ -1508,6 +1526,8 @@ struct libcec_configuration
     cecVersion =         (cec_version)CEC_DEFAULT_SETTING_CEC_VERSION;
     adapterType =                     ADAPTERTYPE_UNKNOWN;
     iDoubleTapTimeoutMs =             CEC_DOUBLE_TAP_TIMEOUT_MS;
+    comboKey =                        CEC_USER_CONTROL_CODE_STOP;
+    iComboKeyTimeoutMs =              CEC_DEFAULT_COMBO_TIMEOUT_MS;
 
     memset(strDeviceName, 0, 13);
     deviceTypes.Clear();

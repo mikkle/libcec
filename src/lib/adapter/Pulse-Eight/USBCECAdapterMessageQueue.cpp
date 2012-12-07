@@ -164,14 +164,12 @@ bool CCECAdapterMessageQueueEntry::IsResponse(const CCECAdapterMessage &msg)
       thisMsgCode == MSGCODE_SET_HDMI_VERSION ||
       thisMsgCode == MSGCODE_SET_OSD_NAME ||
       thisMsgCode == MSGCODE_WRITE_EEPROM ||
-      thisMsgCode == MSGCODE_TRANSMIT_IDLETIME)
+      thisMsgCode == MSGCODE_TRANSMIT_IDLETIME ||
+      thisMsgCode == MSGCODE_SET_ACTIVE_SOURCE)
     return thisMsgCode == msgResponse;
 
   if (!m_message->IsTranmission())
-  {
-    m_queue->m_com->m_callback->GetLib()->AddLog(CEC_LOG_WARNING, "FIXME! not a transmission: %s", msg.ToString().c_str());
     return false;
-  }
 
   return ((msgCode == MSGCODE_COMMAND_ACCEPTED || msgCode == MSGCODE_COMMAND_REJECTED) &&
       (msgResponse == MSGCODE_TRANSMIT_ACK_POLARITY || msgResponse == MSGCODE_TRANSMIT || msgResponse == MSGCODE_TRANSMIT_EOM)) ||
