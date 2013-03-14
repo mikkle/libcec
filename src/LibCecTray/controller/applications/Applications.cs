@@ -1,7 +1,7 @@
 ﻿/*
  * This file is part of the libCEC(R) library.
  *
- * libCEC(R) is Copyright (C) 2011-2012 Pulse-Eight Limited.  All rights reserved.
+ * libCEC(R) is Copyright (C) 2011-2013 Pulse-Eight Limited.  All rights reserved.
  * libCEC(R) is an original work, containing original code.
  *
  * libCEC(R) is a trademark of Pulse-Eight Limited.
@@ -74,7 +74,7 @@ namespace LibCECTray.controller.applications
           {
             if (item.Length > 0)
             {
-              var app = ApplicationController.FromString(_controller.Settings, item);
+              var app = ApplicationController.FromString(_controller, _controller.Settings, item);
               if (app != null)
                 _controllers.Add(app.ProcessName, app);
             }
@@ -100,9 +100,9 @@ namespace LibCECTray.controller.applications
       get
       {
         var defaultValues = new Dictionary<string, ApplicationController>();
-        WMCController wmcController = new WMCController(_controller.Settings);
+        WMCController wmcController = new WMCController(_controller);
         defaultValues.Add(wmcController.ProcessName, wmcController);
-        XBMCController xbmcController = new XBMCController(_controller.Settings);
+        XBMCController xbmcController = new XBMCController(_controller);
         defaultValues.Add(xbmcController.ProcessName, xbmcController);
 
         return defaultValues;

@@ -1,7 +1,7 @@
 ﻿/*
  * This file is part of the libCEC(R) library.
  *
- * libCEC(R) is Copyright (C) 2011-2012 Pulse-Eight Limited.  All rights reserved.
+ * libCEC(R) is Copyright (C) 2011-2013 Pulse-Eight Limited.  All rights reserved.
  * libCEC(R) is an original work, containing original code.
  *
  * libCEC(R) is a trademark of Pulse-Eight Limited.
@@ -49,9 +49,9 @@ namespace LibCECTray.controller.applications
   /// </summary>
   class ApplicationController
   {
-    public ApplicationController(CECSettings settings, string uiName, string processName, string filename, string workingDirectory)
+    public ApplicationController(CECController controller, string uiName, string processName, string filename, string workingDirectory)
     {
-      Settings = settings;
+      Controller = controller;
       UiName = uiName;
       ProcessName = processName;
       ApplicationFilename = filename;
@@ -60,13 +60,13 @@ namespace LibCECTray.controller.applications
       IsInternal = false;
     }
 
-    public static ApplicationController FromString(CECSettings settings, string serialisedConfig)
+    public static ApplicationController FromString(CECController controller, CECSettings settings, string serialisedConfig)
     {
       var splitString = serialisedConfig.Split(';');
       if (splitString.Length != 4)
         throw new InvalidDataException("incorrect number of parameters");
 
-      return new ApplicationController(settings, splitString[0], splitString[1], splitString[2], splitString[3]);
+      return new ApplicationController(controller, splitString[0], splitString[1], splitString[2], splitString[3]);
     }
 
     public string AsString()
@@ -114,7 +114,20 @@ namespace LibCECTray.controller.applications
                                 var item = args.RowIndex < ButtonConfig.Count ? ButtonConfig[args.RowIndex] : null;
                                 if (item == null)
                                   return;
-                                (new CecButtonConfigUI(item)).ShowDialog();
+                                if (args.ColumnIndex >= 0)
+                                {
+                                  (new CecButtonConfigUI(item)).ShowDialog();
+                                }
+                                else
+                                {
+                                  var mappedButton = ButtonConfig[item.Key]; 
+                                  if (mappedButton == null || mappedButton.Value.Empty())
+                                    return;
+
+                                    var controlWindow = FindInstance();
+                                    if (controlWindow != IntPtr.Zero && item.Key.Duration == 0)
+                                      mappedButton.Value.Transmit(controlWindow);
+                                }
                               };
 
       foreach (var item in _buttonConfig)
@@ -235,7 +248,7 @@ namespace LibCECTray.controller.applications
         return false;
 
       var controlWindow = FindInstance();
-      if (controlWindow != IntPtr.Zero && key.Duration == 0)
+      if (controlWindow != IntPtr.Zero && (key.Duration == 0 || key.Duration > 500))
         return mappedButton.Value.Transmit(controlWindow);
 
       return false;
@@ -370,7 +383,10 @@ namespace LibCECTray.controller.applications
       get { return _buttonConfig ?? (_buttonConfig = new CecButtonConfig(this)); }
     }
 
-    public CECSettings Settings;
+    public CECSettings Settings
+    {
+      get { return Controller.Settings; }
+    }
     protected DataGridView CecButtonGridView;
 
     public virtual ApplicationAction DefaultValue(CecKeypress key)
@@ -393,6 +409,8 @@ namespace LibCECTray.controller.applications
     }
 
     private bool _applicationRunning;
+
+    protected readonly CECController Controller;
 
     #endregion
   }

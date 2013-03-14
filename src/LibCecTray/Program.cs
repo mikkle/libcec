@@ -1,7 +1,7 @@
 ﻿/*
  * This file is part of the libCEC(R) library.
  *
- * libCEC(R) is Copyright (C) 2011-2012 Pulse-Eight Limited.  All rights reserved.
+ * libCEC(R) is Copyright (C) 2011-2013 Pulse-Eight Limited.  All rights reserved.
  * libCEC(R) is an original work, containing original code.
  *
  * libCEC(R) is a trademark of Pulse-Eight Limited.
@@ -42,7 +42,15 @@ namespace LibCECTray
     private static CECTray _instance;
     public static CECTray Instance
     {
-      get { return _instance ?? (_instance = new CECTray()); }
+      get
+      {
+        if (_instance == null)
+        {
+          _instance = new CECTray();
+          _instance.Initialise();
+        }
+        return _instance;
+      }
     }
 
     [STAThread]

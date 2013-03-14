@@ -1,7 +1,7 @@
 ﻿/*
  * This file is part of the libCEC(R) library.
  *
- * libCEC(R) is Copyright (C) 2011-2012 Pulse-Eight Limited.  All rights reserved.
+ * libCEC(R) is Copyright (C) 2011-2013 Pulse-Eight Limited.  All rights reserved.
  * libCEC(R) is an original work, containing original code.
  *
  * libCEC(R) is a trademark of Pulse-Eight Limited.
@@ -158,10 +158,13 @@ namespace LibCECTray.settings
 
       ResetItems(BaseItems.Count == 0);
 
-      control.SelectedValueChanged += delegate
-                                        {
-                                          Value = BaseItems[control.SelectedIndex];
-                                        };
+      if (BaseItems.Count > 0 && control.SelectedIndex < BaseItems.Count)
+      {
+        control.SelectedValueChanged += delegate
+                                          {
+                                            Value = BaseItems[control.SelectedIndex];
+                                          };
+      }
     }
 
     public override Control ValueControl

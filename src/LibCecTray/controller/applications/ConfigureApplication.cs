@@ -1,7 +1,7 @@
 ﻿/*
  * This file is part of the libCEC(R) library.
  *
- * libCEC(R) is Copyright (C) 2011-2012 Pulse-Eight Limited.  All rights reserved.
+ * libCEC(R) is Copyright (C) 2011-2013 Pulse-Eight Limited.  All rights reserved.
  * libCEC(R) is an original work, containing original code.
  *
  * libCEC(R) is a trademark of Pulse-Eight Limited.
@@ -132,7 +132,7 @@ namespace LibCECTray.controller.applications
       }
       else if (_cecController != null)
       {
-        ApplicationController newController = new ApplicationController(_settings, tbUiName.Text, tbProcessName.Text, tbFilename.Text, tbWorkingDir.Text);
+        ApplicationController newController = new ApplicationController(_cecController, tbUiName.Text, tbProcessName.Text, tbFilename.Text, tbWorkingDir.Text);
         if (_cecController.RegisterApplication(newController))
           newController.Settings.Persist();
       }
@@ -145,8 +145,8 @@ namespace LibCECTray.controller.applications
       Dispose();
     }
 
-    private ApplicationController _controller;
-    private CECController _cecController;
-    private CECSettings _settings;
+    private readonly ApplicationController _controller;
+    private readonly CECController _cecController;
+    private readonly CECSettings _settings;
   }
 }

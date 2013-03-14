@@ -1,7 +1,7 @@
 /*
 * This file is part of the libCEC(R) library.
 *
-* libCEC(R) is Copyright (C) 2011-2012 Pulse-Eight Limited.  All rights reserved.
+* libCEC(R) is Copyright (C) 2011-2013 Pulse-Eight Limited.  All rights reserved.
 * libCEC(R) is an original work, containing original code.
 *
 * libCEC(R) is a trademark of Pulse-Eight Limited.
@@ -377,7 +377,7 @@ namespace CecSharp
 
       for (uint8_t iPtr = 0; iPtr < 16; iPtr++)
         if (activeDevices[iPtr])
-          retVal->Addresses[iDevices++] = (CecLogicalAddress)iPtr;
+          retVal->Set((CecLogicalAddress)iPtr);
 
       return retVal;
     }
@@ -474,7 +474,11 @@ namespace CecSharp
     String ^ GetDeviceOSDName(CecLogicalAddress logicalAddress)
     {
       cec_osd_name osd = m_libCec->GetDeviceOSDName((cec_logical_address) logicalAddress);
-      return gcnew String(osd.name);
+      // we need to terminate with \0, and we only got 14 chars in osd.name
+      char strOsdName[15];
+      memset(strOsdName, 0, sizeof(strOsdName));
+      memcpy(strOsdName, osd.name, sizeof(osd.name));
+      return gcnew String(strOsdName);
     }
 
     /// <summary>
@@ -821,6 +825,9 @@ namespace CecSharp
 
       if (netConfig->ServerVersion >= CecServerVersion::Version1_8_0)
         config.cecVersion = (cec_version)netConfig->CECVersion;
+
+      if (netConfig->ServerVersion >= CecServerVersion::Version2_1_0)
+        config.bPowerOnScreensaver  = netConfig->PowerOnScreensaver ? 1 : 0;
 
       config.callbacks = &g_cecCallbacks;
     }

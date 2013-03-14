@@ -1,7 +1,7 @@
 ﻿/*
  * This file is part of the libCEC(R) library.
  *
- * libCEC(R) is Copyright (C) 2011-2012 Pulse-Eight Limited.  All rights reserved.
+ * libCEC(R) is Copyright (C) 2011-2013 Pulse-Eight Limited.  All rights reserved.
  * libCEC(R) is an original work, containing original code.
  *
  * libCEC(R) is a trademark of Pulse-Eight Limited.
@@ -107,6 +107,11 @@ namespace LibCECTray.controller.actions
       SendEvent(UpdateEventType.ProgressBar, 90);
       SendEvent(UpdateEventType.StatusText, Resources.action_polling_active_devices);
       SendEvent(UpdateEventType.PollDevices);
+
+      if (!_lib.IsActiveDevice(CecLogicalAddress.Tv))
+      {
+        MessageBox.Show(Resources.alert_tv_poll_failed, Resources.cec_alert, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+      }
 
       SendEvent(UpdateEventType.ProgressBar, 100);
       SendEvent(UpdateEventType.StatusText, Resources.ready);

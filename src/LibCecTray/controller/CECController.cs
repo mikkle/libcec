@@ -1,7 +1,7 @@
 ﻿/*
  * This file is part of the libCEC(R) library.
  *
- * libCEC(R) is Copyright (C) 2011-2012 Pulse-Eight Limited.  All rights reserved.
+ * libCEC(R) is Copyright (C) 2011-2013 Pulse-Eight Limited.  All rights reserved.
  * libCEC(R) is an original work, containing original code.
  *
  * libCEC(R) is a trademark of Pulse-Eight Limited.
@@ -203,6 +203,11 @@ namespace LibCECTray.controller
     /// </summary>
     public void Initialise()
     {
+      // only load once
+      if (_initialised)
+        return;
+      _initialised = true;
+
       CECActions.ConnectToDevice(Config);
       Applications.Initialise(this);
     }
@@ -215,6 +220,7 @@ namespace LibCECTray.controller
       Lib.DisableCallbacks();
       Lib.StandbyDevices(CecLogicalAddress.Broadcast);
       Lib.Close();
+      _initialised = false;
     }
 
     /// <summary>
@@ -361,6 +367,32 @@ namespace LibCECTray.controller
       return 1;
     }
 
+    public override int ReceiveAlert(CecAlert alert, CecParameter data)
+    {
+      switch (alert)
+      {
+        case CecAlert.ServiceDevice:
+          MessageBox.Show(Resources.alert_service_device, Resources.cec_alert, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+          break;
+        case CecAlert.ConnectionLost:
+          MessageBox.Show(Resources.alert_connection_lost, Resources.cec_alert, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+          break;
+        case CecAlert.PermissionError:
+          MessageBox.Show(Resources.alert_permission_error, Resources.cec_alert, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+          break;
+        case CecAlert.PortBusy:
+          MessageBox.Show(Resources.alert_port_busy, Resources.cec_alert, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+          break;
+        case CecAlert.PhysicalAddressError:
+          MessageBox.Show(Resources.alert_physical_address_error, Resources.cec_alert, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+          break;
+        case CecAlert.TVPollFailed:
+          MessageBox.Show(Resources.alert_tv_poll_failed, Resources.cec_alert, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+          break;
+      }
+      return 1;
+    }
+
     public override int ConfigurationChanged(LibCECConfiguration config)
     {
       Settings.PhysicalAddress.Value = Config.PhysicalAddress;
@@ -438,7 +470,7 @@ namespace LibCECTray.controller
       {
         if (_config == null)
         {
-          _config = new LibCECConfiguration { DeviceName = "CEC Tray", ClientVersion = CecClientVersion.Version2_0_5 };
+          _config = new LibCECConfiguration { DeviceName = "CEC Tray", ClientVersion = CecClientVersion.CurrentVersion };
           _config.DeviceTypes.Types[0] = CecDeviceType.RecordingDevice;
           _config.SetCallbacks(this);
 
@@ -519,6 +551,7 @@ namespace LibCECTray.controller
     private readonly CECTray _gui;
     public Actions CECActions;
     private bool _deviceChangeWarningDisplayed;
+    private bool _initialised;
 
     #endregion
   }
