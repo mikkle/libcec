@@ -583,13 +583,6 @@ int CCECCommandHandler::HandleSetStreamPath(const cec_command &command)
         device->MarkAsActiveSource();
       return COMMAND_HANDLED;
     }
-    else
-    {
-      cec_logical_address previousSource = m_processor->GetActiveSource(false);
-      CCECBusDevice* device = m_processor->GetDevice(previousSource);
-      if (device && device->GetCurrentPhysicalAddress() != iStreamAddress)
-        device->MarkAsInactiveSource();
-    }
   }
 
   return CEC_ABORT_REASON_INVALID_OPERAND;
@@ -1237,6 +1230,14 @@ bool CCECCommandHandler::ActivateSource(bool bTransmitDelayedCommandsOnly /* = f
         if (playbackDevice && SendDeckStatusUpdateOnActiveSource())
           bActiveSourceFailed = !playbackDevice->TransmitDeckStatus(CECDEVICE_TV, false);
       }
+
+      // update system audio mode for audiosystem devices
+      if (bTvPresent && !bActiveSourceFailed)
+      {
+        CCECAudioSystem* audioDevice = m_busDevice->AsAudioSystem();
+        if (audioDevice)
+          bActiveSourceFailed = !audioDevice->TransmitSetSystemAudioMode(CECDEVICE_TV, false);
+      }
     }
 
     // retry later
@@ -1293,6 +1294,6 @@ void CCECCommandHandler::RequestEmailFromCustomer(const cec_command& command)
     m_logsRequested.insert(make_pair(command.opcode, commands));
   }
 
-  LIB_CEC->AddLog(CEC_LOG_NOTICE, "Unmapped code detected. Please send an email to support@pulse-eight.com with the following details, and if you pressed a key, tell us which one you pressed, and we'll add support for this it.\nCEC command: %s\nVendor ID: %s (%06x)", CCECTypeUtils::ToString(command).c_str(), CCECTypeUtils::ToString(m_vendorId), m_vendorId);
+  LIB_CEC->AddLog(CEC_LOG_NOTICE, "Unmapped code detected. Please send an email to support@pulse-eight.com with the following details, and if you pressed a key, tell us which one you pressed, and we'll add support for this it.\nCEC command: %s\nVendor ID: %s (%06x)", ToString(command).c_str(), ToString(m_vendorId), m_vendorId);
 }
 

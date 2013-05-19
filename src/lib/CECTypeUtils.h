@@ -493,6 +493,7 @@ namespace CEC
       case CEC_VENDOR_SONY:
         return "Sony";
       case CEC_VENDOR_TOSHIBA:
+      case CEC_VENDOR_TOSHIBA2:
         return "Toshiba";
       case CEC_VENDOR_AKAI:
         return "Akai";
@@ -516,6 +517,10 @@ namespace CEC
         return "Loewe";
       case CEC_VENDOR_DENON:
         return "Denon";
+      case CEC_VENDOR_MARANTZ:
+        return "Marantz";
+      case CEC_VENDOR_HARMAN_KARDON:
+        return "Harman/Kardon";
       default:
         return "Unknown";
       }
@@ -575,6 +580,10 @@ namespace CEC
         return "2.1.0";
       case CEC_CLIENT_VERSION_2_1_1:
         return "2.1.1";
+      case CEC_CLIENT_VERSION_2_1_2:
+        return "2.1.2";
+      case CEC_CLIENT_VERSION_2_1_3:
+        return "2.1.3";
       default:
         return "Unknown";
       }
@@ -634,6 +643,10 @@ namespace CEC
         return "2.1.0";
       case CEC_SERVER_VERSION_2_1_1:
         return "2.1.1";
+      case CEC_SERVER_VERSION_2_1_2:
+        return "2.1.2";
+      case CEC_SERVER_VERSION_2_1_3:
+        return "2.1.3";
       default:
         return "Unknown";
       }
