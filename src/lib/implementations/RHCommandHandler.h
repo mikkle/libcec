@@ -35,20 +35,17 @@
 
 namespace CEC
 {
-  class CANCommandHandler : public CCECCommandHandler
+  class CRHCommandHandler : public CCECCommandHandler
   {
   public:
-    CANCommandHandler(CCECBusDevice *busDevice,
+    CRHCommandHandler(CCECBusDevice *busDevice,
                       int32_t iTransmitTimeout = CEC_DEFAULT_TRANSMIT_TIMEOUT,
                       int32_t iTransmitWait = CEC_DEFAULT_TRANSMIT_WAIT,
                       int8_t iTransmitRetries = CEC_DEFAULT_TRANSMIT_RETRIES,
                       int64_t iActiveSourcePending = 0);
-    virtual ~CANCommandHandler(void) {};
-
-    int HandleVendorRemoteButtonDown(const cec_command &command);
-    int HandleDeviceVendorCommandWithId(const cec_command &command);
+    virtual ~CRHCommandHandler(void) {};
 
   protected:
-    bool PowerOn(const cec_logical_address iInitiator, const cec_logical_address iDestination);
+    int HandleDeviceVendorCommandWithId(const cec_command &command);
   };
 };
