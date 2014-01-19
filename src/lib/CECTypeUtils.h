@@ -521,6 +521,8 @@ namespace CEC
         return "Marantz";
       case CEC_VENDOR_HARMAN_KARDON:
         return "Harman/Kardon";
+      case CEC_VENDOR_PULSE_EIGHT:
+        return "Pulse Eight";
       default:
         return "Unknown";
       }
@@ -584,6 +586,8 @@ namespace CEC
         return "2.1.2";
       case CEC_CLIENT_VERSION_2_1_3:
         return "2.1.3";
+      case CEC_CLIENT_VERSION_2_1_4:
+        return "2.1.4";
       default:
         return "Unknown";
       }
@@ -647,6 +651,8 @@ namespace CEC
         return "2.1.2";
       case CEC_SERVER_VERSION_2_1_3:
         return "2.1.3";
+      case CEC_SERVER_VERSION_2_1_4:
+        return "2.1.4";
       default:
         return "Unknown";
       }

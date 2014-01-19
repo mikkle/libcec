@@ -833,6 +833,7 @@ typedef enum cec_vendor_id
   CEC_VENDOR_ONKYO         = 0x0009B0,
   CEC_VENDOR_MEDION        = 0x000CB8,
   CEC_VENDOR_TOSHIBA2      = 0x000CE7,
+  CEC_VENDOR_PULSE_EIGHT   = 0x001582,
   CEC_VENDOR_AKAI          = 0x0020C7,
   CEC_VENDOR_AOC           = 0x002467,
   CEC_VENDOR_PANASONIC     = 0x008045,
@@ -1422,7 +1423,8 @@ typedef enum cec_client_version
   CEC_CLIENT_VERSION_2_1_1   = 0x2101,
   CEC_CLIENT_VERSION_2_1_2   = 0x2102,
   CEC_CLIENT_VERSION_2_1_3   = 0x2103,
-  CEC_CLIENT_VERSION_CURRENT = 0x2103
+  CEC_CLIENT_VERSION_2_1_4   = 0x2104,
+  CEC_CLIENT_VERSION_CURRENT = 0x2104
 } cec_client_version;
 
 typedef enum cec_server_version
@@ -1454,7 +1456,8 @@ typedef enum cec_server_version
   CEC_SERVER_VERSION_2_1_1   = 0x2101,
   CEC_SERVER_VERSION_2_1_2   = 0x2102,
   CEC_SERVER_VERSION_2_1_3   = 0x2103,
-  CEC_SERVER_VERSION_CURRENT = 0x2103
+  CEC_SERVER_VERSION_2_1_4   = 0x2104,
+  CEC_SERVER_VERSION_CURRENT = 0x2104
 } cec_server_version;
 
 struct libcec_configuration

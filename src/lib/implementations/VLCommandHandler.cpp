@@ -109,19 +109,23 @@ int CVLCommandHandler::HandleDeviceVendorCommandWithId(const cec_command &comman
   if (command.initiator == CECDEVICE_TV &&
       command.parameters.At(3) == VL_UNKNOWN1)
   {
-    // XXX this is also sent when the TV is powered off
-    // TODO power up sends 06:05. check whether this is also sent on power off
-#if 0
-    // set the power up event time
+    if (command.parameters.size >= 5 && command.parameters.At(4) == 0x05)
     {
-      CLockObject lock(m_mutex);
-      if (m_iPowerUpEventReceived == 0)
-        m_iPowerUpEventReceived = GetTimeMs();
+      // set the power up event time
+      {
+        CLockObject lock(m_mutex);
+        if (m_iPowerUpEventReceived == 0)
+          m_iPowerUpEventReceived = GetTimeMs();
+      }
+      // mark the TV as powered on
+      m_processor->GetTV()->SetPowerStatus(CEC_POWER_STATUS_ON);
+
+      CCECBusDevice* dev = m_processor->GetPrimaryDevice();
+      if (dev && dev->IsActiveSource())
+        dev->TransmitActiveSource(false);
+
+      return COMMAND_HANDLED;
     }
-    // mark the TV as powered on
-    m_processor->GetTV()->SetPowerStatus(CEC_POWER_STATUS_ON);
-#endif
-    return COMMAND_HANDLED;
   }
   else if (command.initiator == CECDEVICE_TV &&
       command.destination == CECDEVICE_BROADCAST &&
@@ -249,10 +253,15 @@ int CVLCommandHandler::HandleVendorCommand(const cec_command &command)
   if (command.parameters.size == 3 &&
       command.parameters[0] == 0x10 &&
       command.parameters[1] == 0x01 &&
-      command.parameters[2] == 0x05 &&
       m_processor->IsHandledByLibCEC(command.destination))
   {
+    // XXX i've seen 0x05 and 0x03 as third param. these probably indicate different types of TVs/capabilities
+    // when we feature abort this, then the TV will try the same thing with a vendor command with id
     SendVendorCommandCapabilities(m_processor->GetLogicalAddress(), command.initiator);
+
+    CCECBusDevice* dev = m_processor->GetDevice(command.destination);
+    if (dev && dev->IsActiveSource())
+      dev->ActivateSource(500);
     return COMMAND_HANDLED;
   }
 
@@ -262,7 +271,7 @@ int CVLCommandHandler::HandleVendorCommand(const cec_command &command)
 bool CVLCommandHandler::SourceSwitchAllowed(void)
 {
   if (!PowerUpEventReceived())
-    TransmitRequestPowerStatus(m_processor->GetPrimaryDevice()->GetLogicalAddress(), CECDEVICE_TV, false);
+    TransmitRequestPowerStatus(m_processor->GetPrimaryDevice()->GetLogicalAddress(), CECDEVICE_TV, false, false);
 
   return PowerUpEventReceived();
 }
